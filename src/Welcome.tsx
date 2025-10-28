@@ -116,7 +116,7 @@ const Welcome = () => {
             <a href="#get-started">Get Started</a>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link to="https://github.com/golem-vanity-market/golem-vanity-market-cli" target="_blank" rel="noreferrer">
+            <Link to="https://github.com/orgs/golem-vanity-market/repositories" target="_blank" rel="noreferrer">
               <Github className="mr-2 h-4 w-4" />
               View on GitHub
             </Link>
