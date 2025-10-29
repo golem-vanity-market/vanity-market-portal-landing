@@ -1,6 +1,6 @@
 {
-  "name": "vanity-market-portal",
-  "description": "Portal for Golem Vanity Market",
+  "name": "vanity-market-portal-landing",
+  "description": "Portal for Golem Vanity Market (Landing)",
   "version": "0.1.0",
   "private": true,
   "type": "module",
