@@ -1,6 +1,19 @@
-import { AlertTriangle, Github, HandHelping, MessageSquare } from "lucide-react";
+import {
+  AlertTriangle,
+  Github,
+  HandHelping,
+  MessageSquare,
+} from "lucide-react";
 
-const SocialLink = ({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) => (
+const SocialLink = ({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+}) => (
   <a
     href={href}
     target="_blank"
@@ -40,12 +53,25 @@ export const Footer = () => {
 
         <div className="flex items-center gap-2 text-center text-xs text-muted-foreground sm:text-left">
           <AlertTriangle className="size-4 flex-shrink-0" />
-          <span>This project is still experimental. Data may not be fully accurate. Use only as reference.</span>
+          <span>
+            This project is still experimental. Data may not be fully accurate.
+            Use only as reference. Built from commit:
+            <a
+              href={`https://github.com/golem-vanity-market/vanity-market-portal-landing/commit/${import.meta.env.VITE_GIT_COMMIT}`}
+            >
+              {import.meta.env.VITE_GIT_COMMIT}
+            </a>
+          </span>
         </div>
 
         <div className="flex items-center space-x-4 sm:space-x-6">
           {socialLinks.map((link) => (
-            <SocialLink key={link.href} href={link.href} icon={link.icon} label={link.label} />
+            <SocialLink
+              key={link.href}
+              href={link.href}
+              icon={link.icon}
+              label={link.label}
+            />
           ))}
         </div>
       </div>
