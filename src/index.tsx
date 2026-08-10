@@ -8,6 +8,7 @@ const container = document.getElementById("root") as HTMLDivElement;
 const root = createRoot(container);
 
 import Welcome from "./Welcome";
+import ProviderInfoPage from "./provider/ProviderInfoPage";
 import { Toaster } from "@/components/ui/sonner";
 
 const router = createBrowserRouter(
@@ -19,6 +20,12 @@ const router = createBrowserRouter(
           path: "/",
           index: true,
           element: <Welcome />,
+        },
+        {
+          // Deliberately no provider listing — this route exists so
+          // stats.golem.network can deep-link a single provider's dashboard.
+          path: "/provider/info/:providerId",
+          element: <ProviderInfoPage />,
         },
       ],
     },
