@@ -326,8 +326,8 @@ const HintAlert = ({
   }
   if (hint.id === "execution-failure") {
     return (
-      <Alert className="border-amber-500/50 [&>svg]:text-amber-500">
-        <AlertTriangle className="h-4 w-4" />
+      <Alert variant="destructive">
+        <XCircle className="h-4 w-4" />
         <AlertTitle>Check your node — a task failed to run</AlertTitle>
         <AlertDescription>{softenReason(hint.message)}</AlertDescription>
       </Alert>
