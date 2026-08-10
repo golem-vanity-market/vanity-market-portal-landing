@@ -123,7 +123,14 @@ const softenReason = (s: string): string =>
   s
     .replace(/ban-server/gi, "fleet")
     .replace(/\bbanned\b/gi, "paused")
-    .replace(/\bban(s)?\b/gi, (_m, s1) => (s1 ? "cooldowns" : "cooldown"));
+    .replace(/\bban(s)?\b/gi, (_m, s1) => (s1 ? "cooldowns" : "cooldown"))
+    .replace(
+      /failed to run (the )?command/gi,
+      "the node accepted a task but could not run it",
+    );
+
+const isExecutionFailure = (reason: string | null | undefined): boolean =>
+  !!reason && /failed to run (the )?command/i.test(reason);
 
 const relativeTime = (iso: string | null): string => {
   if (!iso) return "never";
@@ -260,6 +267,10 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     a: "An agreement is wound down (and the node given a short cooldown) when its measured efficiency (TH/GLM) or speed (H/s) stays below the enforced target for 3 consecutive checks. The exact trigger of your last cooldown — measured value, target, and measurement window — is shown in the Performance section above.",
   },
   {
+    q: "It says a task failed to run on my node — what does that mean?",
+    a: "Your node accepted an agreement, but the task runtime terminated before (or while) the command ran, so the fleet paused matchmaking with it. Unlike performance cooldowns, this is a real technical issue on the provider machine — typical causes are the provider agent or VM runtime restarting or crashing, the machine rebooting, or the runtime being killed by the out-of-memory killer. Check your provider logs (and dmesg for OOM kills) around the time shown on this page; pricing or speed changes will not help until the machine runs tasks reliably.",
+  },
+  {
     q: "How do I meet the efficiency target?",
     a: "Efficiency is hashes delivered per GLM billed, so there are two levers: price and speed. In practice price is the easier one — lowering your per-thread CPU price directly raises efficiency at unchanged speed. When you are below target, the hint at the top of the page computes the price cut that would get you there.",
   },
@@ -298,15 +309,27 @@ const HintAlert = ({
     const until = status.activeBan
       ? ` — it clears in ${untilTime(status.activeBan.expiresAt)}`
       : "";
+    const execFail = isExecutionFailure(status.activeBan?.reason);
     return (
       <Alert className="border-sky-500/50 [&>svg]:text-sky-500">
         <PauseCircle className="h-4 w-4" />
         <AlertTitle>Taking a short break</AlertTitle>
         <AlertDescription>
           The fleet has paused new work for this node for a little while
-          {until}. Nothing to do on your side — work resumes automatically.
-          The tips below show how to avoid the next pause.
+          {until}.{" "}
+          {execFail
+            ? "This pause was caused by a task that failed to run on your machine — see the notice below."
+            : "Nothing to do on your side — work resumes automatically. The tips below show how to avoid the next pause."}
         </AlertDescription>
+      </Alert>
+    );
+  }
+  if (hint.id === "execution-failure") {
+    return (
+      <Alert className="border-amber-500/50 [&>svg]:text-amber-500">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Check your node — a task failed to run</AlertTitle>
+        <AlertDescription>{softenReason(hint.message)}</AlertDescription>
       </Alert>
     );
   }
