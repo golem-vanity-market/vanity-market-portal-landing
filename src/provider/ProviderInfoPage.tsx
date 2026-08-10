@@ -19,12 +19,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertTriangle,
-  Ban,
   Check,
   CheckCircle2,
   Copy,
   ExternalLink,
   Info,
+  PauseCircle,
   RefreshCw,
   XCircle,
 } from "lucide-react";
@@ -110,8 +110,20 @@ const CATEGORY_STYLE: Record<string, string> = {
   underperformer:
     "border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10",
   risky: "border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10",
-  banned: "border-red-500/50 text-red-600 dark:text-red-400 bg-red-500/10",
+  banned: "border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10",
 };
+
+// The backend still speaks in "bans"; the page deliberately presents them as
+// temporary cooldowns so providers don't read them as a lasting sanction.
+const CATEGORY_LABEL: Record<string, string> = {
+  banned: "on cooldown",
+};
+
+const softenReason = (s: string): string =>
+  s
+    .replace(/ban-server/gi, "fleet")
+    .replace(/\bbanned\b/gi, "paused")
+    .replace(/\bban(s)?\b/gi, (_m, s1) => (s1 ? "cooldowns" : "cooldown"));
 
 const relativeTime = (iso: string | null): string => {
   if (!iso) return "never";
@@ -210,8 +222,8 @@ const TargetMeter = ({
           <>
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
             <span>
-              {(ratio * 100).toFixed(0)}% of the enforced target — agreements
-              get terminated below 100%
+              {(ratio * 100).toFixed(0)}% of the enforced target — staying
+              below 100% leads to a short cooldown
             </span>
           </>
         )}
@@ -226,22 +238,26 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     a: "It is your provider's standing with the Vanity Market requestor fleet — a set of Golem requestors that rent CPU time from providers like yours to search for vanity blockchain addresses. Everything here is measured from the fleet's own agreements with your node.",
   },
   {
-    q: "I got banned — should I worry?",
+    q: "What is a cooldown? Should I worry?",
     a: (
       <>
-        <strong>No.</strong> Bans here are temporary and expire automatically —
-        the first ban in a day lasts 1 hour, and only repeated bans within the
-        same 24 hours escalate (2 h, 3 h, … capped at 24 h). A clean 24 hours
-        fully resets the escalation, and the fleet also periodically lifts all
-        bans. A ban only pauses work with this fleet; it does not affect your
-        standing anywhere else on the Golem network, and your node is picked up
-        again as soon as it expires.
+        <strong>Not at all.</strong> A cooldown is a short, automatic pause in
+        matchmaking with this fleet — the fleet simply stops sending new work
+        to a node for a while when an agreement ran below the efficiency or
+        speed target. The first pause in a day lasts 1 hour; only repeated
+        ones within the same 24 hours grow a bit longer (2 h, 3 h, … capped at
+        24 h), and a clean 24 hours resets that completely. The fleet also
+        periodically clears all cooldowns at once. Nothing is held against
+        your node: it does not affect your standing anywhere else on the Golem
+        network, and work resumes automatically the moment the pause ends.
+        (Some dashboards, including stats.golem.network, label these pauses
+        &ldquo;bans&rdquo; — same thing, equally temporary.)
       </>
     ),
   },
   {
-    q: "Why was I banned?",
-    a: "An agreement is terminated (and the provider temporarily banned) when its measured efficiency (TH/GLM) or speed (H/s) stays below the enforced target for 3 consecutive checks. The exact reason of your last ban — measured value, target, and measurement window — is shown in the Performance section above.",
+    q: "Why was my node paused?",
+    a: "An agreement is wound down (and the node given a short cooldown) when its measured efficiency (TH/GLM) or speed (H/s) stays below the enforced target for 3 consecutive checks. The exact trigger of your last cooldown — measured value, target, and measurement window — is shown in the Performance section above.",
   },
   {
     q: "How do I meet the efficiency target?",
@@ -261,7 +277,7 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "What is the score?",
-    a: "A 0–100 blend of efficiency vs target, agreements completed without bans, work volume, ban recency, and data freshness. It drives the category label (trusted, reliable, average, underperformer, new, risky, banned) and recovers on its own as you deliver clean work.",
+    a: "A 0–100 blend of efficiency vs target, agreements completed without cooldowns, work volume, how recent the last cooldown was, and data freshness. It drives the category label (trusted, reliable, average, underperformer, new, risky, on cooldown) and recovers on its own as you deliver clean work.",
   },
   {
     q: "How fresh is this data?",
@@ -269,7 +285,47 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
 ];
 
-const HintAlert = ({ hint }: { hint: PortalHint }) => {
+const HintAlert = ({
+  hint,
+  status,
+}: {
+  hint: PortalHint;
+  status: PortalProviderReport["status"];
+}) => {
+  // The two ban-flavored hints from the API get friendlier client-side copy;
+  // everything else passes through (with any stray "ban" wording softened).
+  if (hint.id === "banned") {
+    const until = status.activeBan
+      ? ` — it clears in ${untilTime(status.activeBan.expiresAt)}`
+      : "";
+    return (
+      <Alert className="border-sky-500/50 [&>svg]:text-sky-500">
+        <PauseCircle className="h-4 w-4" />
+        <AlertTitle>Taking a short break</AlertTitle>
+        <AlertDescription>
+          The fleet has paused new work for this node for a little while
+          {until}. Nothing to do on your side — work resumes automatically.
+          The tips below show how to avoid the next pause.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (hint.id === "ban-escalation") {
+    return (
+      <Alert className="border-sky-500/50 [&>svg]:text-sky-500">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Recent cooldown</AlertTitle>
+        <AlertDescription>
+          {status.bansLast24h === 1
+            ? "This node had one short cooldown in the last 24 h."
+            : `This node had ${status.bansLast24h} short cooldowns in the last 24 h.`}{" "}
+          Cooldowns are routine and clear on their own; repeated ones within a
+          day just last a bit longer (the next would be{" "}
+          {status.nextBanHours} h), and a clean 24 h resets that completely.
+        </AlertDescription>
+      </Alert>
+    );
+  }
   const icon =
     hint.severity === "critical" ? (
       <XCircle className="h-4 w-4" />
@@ -295,7 +351,7 @@ const HintAlert = ({ hint }: { hint: PortalHint }) => {
     >
       {icon}
       <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>{hint.message}</AlertDescription>
+      <AlertDescription>{softenReason(hint.message)}</AlertDescription>
     </Alert>
   );
 };
@@ -408,7 +464,7 @@ const ProviderInfoPage = () => {
               variant="outline"
               className={CATEGORY_STYLE[report.category] ?? ""}
             >
-              {report.category}
+              {CATEGORY_LABEL[report.category] ?? report.category}
             </Badge>
             {targets.relaxed ? (
               <Badge
@@ -445,15 +501,15 @@ const ProviderInfoPage = () => {
       {/* Hints */}
       <div className="space-y-3">
         {report.hints.map((h, i) => (
-          <HintAlert key={`${h.id}-${i}`} hint={h} />
+          <HintAlert key={`${h.id}-${i}`} hint={h} status={status} />
         ))}
         {status.banned || status.bansLast24h > 0 ? (
           <p className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Bans are temporary and nothing to worry about — they expire
-              automatically, a clean 24 h resets the escalation, and they only
-              pause work with this fleet. See the FAQ below.
+              Cooldowns are routine and nothing to worry about — they clear on
+              their own and only pause work with this fleet for a short while.
+              See the FAQ below.
             </span>
           </p>
         ) : null}
@@ -465,8 +521,8 @@ const ProviderInfoPage = () => {
           label="Status"
           value={
             status.banned ? (
-              <span className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <Ban className="h-5 w-5" /> Banned
+              <span className="flex items-center gap-2 text-sky-600 dark:text-sky-400">
+                <PauseCircle className="h-5 w-5" /> Paused
               </span>
             ) : (
               <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
@@ -476,7 +532,7 @@ const ProviderInfoPage = () => {
           }
           sub={
             status.banned && status.activeBan
-              ? `expires in ${untilTime(status.activeBan.expiresAt)}`
+              ? `resumes in ${untilTime(status.activeBan.expiresAt)}`
               : `last seen ${relativeTime(status.lastSeen)}`
           }
         />
@@ -491,12 +547,12 @@ const ProviderInfoPage = () => {
           sub="with the fleet right now"
         />
         <StatTile
-          label="Bans (24h)"
+          label="Cooldowns (24h)"
           value={status.bansLast24h}
           sub={
             status.bansLast24h > 0
-              ? `next ban would last ${status.nextBanHours} h`
-              : "clean — no escalation"
+              ? `next one would last ${status.nextBanHours} h`
+              : "clean — none in 24 h"
           }
         />
       </div>
@@ -507,7 +563,8 @@ const ProviderInfoPage = () => {
           <CardTitle>Enforced targets</CardTitle>
           <CardDescription>
             Measured over the {windowLabel}. Agreements running below either
-            target are terminated and the provider is temporarily banned.
+            target are wound down and the node gets a short matchmaking
+            cooldown.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -566,18 +623,18 @@ const ProviderInfoPage = () => {
               sub="GLM per hour"
             />
             <StatTile
-              label="Bans in window"
+              label="Cooldowns in window"
               value={perf.bans}
               sub={
                 status.lastBanAt
-                  ? `last ban ${relativeTime(status.lastBanAt)}`
-                  : "never banned"
+                  ? `last one ${relativeTime(status.lastBanAt)}`
+                  : "none yet"
               }
             />
           </div>
           {status.lastBanReason ? (
             <p className="mt-4 text-xs text-muted-foreground">
-              Last ban reason: {status.lastBanReason}
+              Last cooldown trigger: {softenReason(status.lastBanReason)}
             </p>
           ) : null}
         </CardContent>
@@ -625,7 +682,7 @@ const ProviderInfoPage = () => {
         <CardHeader>
           <CardTitle>FAQ</CardTitle>
           <CardDescription>
-            How the Vanity Market fleet measures, bans, and pays providers.
+            How the Vanity Market fleet measures, matches, and pays providers.
           </CardDescription>
         </CardHeader>
         <CardContent>
