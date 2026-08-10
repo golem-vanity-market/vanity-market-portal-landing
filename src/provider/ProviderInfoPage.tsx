@@ -7,6 +7,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -214,6 +220,55 @@ const TargetMeter = ({
   );
 };
 
+const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
+  {
+    q: "What is this page?",
+    a: "It is your provider's standing with the Vanity Market requestor fleet — a set of Golem requestors that rent CPU time from providers like yours to search for vanity blockchain addresses. Everything here is measured from the fleet's own agreements with your node.",
+  },
+  {
+    q: "I got banned — should I worry?",
+    a: (
+      <>
+        <strong>No.</strong> Bans here are temporary and expire automatically —
+        the first ban in a day lasts 1 hour, and only repeated bans within the
+        same 24 hours escalate (2 h, 3 h, … capped at 24 h). A clean 24 hours
+        fully resets the escalation, and the fleet also periodically lifts all
+        bans. A ban only pauses work with this fleet; it does not affect your
+        standing anywhere else on the Golem network, and your node is picked up
+        again as soon as it expires.
+      </>
+    ),
+  },
+  {
+    q: "Why was I banned?",
+    a: "An agreement is terminated (and the provider temporarily banned) when its measured efficiency (TH/GLM) or speed (H/s) stays below the enforced target for 3 consecutive checks. The exact reason of your last ban — measured value, target, and measurement window — is shown in the Performance section above.",
+  },
+  {
+    q: "How do I meet the efficiency target?",
+    a: "Efficiency is hashes delivered per GLM billed, so there are two levers: price and speed. In practice price is the easier one — lowering your per-thread CPU price directly raises efficiency at unchanged speed. When you are below target, the hint at the top of the page computes the price cut that would get you there.",
+  },
+  {
+    q: "What does “relaxed targets” mean?",
+    a: "Providers that deliver sustained work (≥100 GH in 24 h) at ≥2× the global efficiency target automatically earn a relaxed target (half the global one), and keep it while they qualify. Well-performing providers therefore get extra headroom instead of tighter scrutiny.",
+  },
+  {
+    q: "Why do I see many very short agreements?",
+    a: "The fleet's requestors fully restart every 6 hours (staggered). Around each restart window a provider is often picked up briefly by a requestor that is itself about to restart, producing a few minutes-long agreements with almost no work besides the one long agreement. This is normal churn on the requestor side, not a fault of your node, and it does not hurt your standing.",
+  },
+  {
+    q: "When do I get paid?",
+    a: "The fleet settles invoices in batches roughly every 6 hours, paying in GLM on Polygon. If an agreement just ended, its payment can therefore take a few hours to show up on-chain.",
+  },
+  {
+    q: "What is the score?",
+    a: "A 0–100 blend of efficiency vs target, agreements completed without bans, work volume, ban recency, and data freshness. It drives the category label (trusted, reliable, average, underperformer, new, risky, banned) and recovers on its own as you deliver clean work.",
+  },
+  {
+    q: "How fresh is this data?",
+    a: "The fleet's monitoring collects agreement data every 30 seconds and this page refreshes itself every minute. The price list is scraped from stats.golem.network a few times per day, so recent price changes can take a while to appear here.",
+  },
+];
+
 const HintAlert = ({ hint }: { hint: PortalHint }) => {
   const icon =
     hint.severity === "critical" ? (
@@ -392,6 +447,16 @@ const ProviderInfoPage = () => {
         {report.hints.map((h, i) => (
           <HintAlert key={`${h.id}-${i}`} hint={h} />
         ))}
+        {status.banned || status.bansLast24h > 0 ? (
+          <p className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Bans are temporary and nothing to worry about — they expire
+              automatically, a clean 24 h resets the escalation, and they only
+              pause work with this fleet. See the FAQ below.
+            </span>
+          </p>
+        ) : null}
       </div>
 
       {/* Status tiles */}
@@ -554,6 +619,28 @@ const ProviderInfoPage = () => {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* FAQ */}
+      <Card>
+        <CardHeader>
+          <CardTitle>FAQ</CardTitle>
+          <CardDescription>
+            How the Vanity Market fleet measures, bans, and pays providers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Accordion type="multiple">
+            {FAQ_ITEMS.map((item, i) => (
+              <AccordionItem key={i} value={`faq-${i}`}>
+                <AccordionTrigger>{item.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  {item.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </CardContent>
+      </Card>
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
