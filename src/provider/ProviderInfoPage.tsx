@@ -132,11 +132,14 @@ const softenReason = (s: string): string =>
 const isExecutionFailure = (reason: string | null | undefined): boolean =>
   !!reason && /failed to run (the )?command/i.test(reason);
 
-// A "failed to run command" reason whose recorded cause is DebitNote
-// acceptance lag happened on the requestor side — the node did nothing wrong.
+// A "failed to run command" reason whose recorded cause is requestor-side
+// (DebitNote acceptance lag, or an agreement we signed but never used) —
+// the node did nothing wrong.
 const isRequestorInterruption = (
   reason: string | null | undefined,
-): boolean => !!reason && /debit\s*-?\s*note/i.test(reason);
+): boolean =>
+  !!reason &&
+  (/debit\s*-?\s*note/i.test(reason) || /no activity (was )?created/i.test(reason));
 
 const relativeTime = (iso: string | null): string => {
   if (!iso) return "never";
