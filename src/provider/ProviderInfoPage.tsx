@@ -132,6 +132,12 @@ const softenReason = (s: string): string =>
 const isExecutionFailure = (reason: string | null | undefined): boolean =>
   !!reason && /failed to run (the )?command/i.test(reason);
 
+// A "failed to run command" reason whose recorded cause is DebitNote
+// acceptance lag happened on the requestor side — the node did nothing wrong.
+const isRequestorInterruption = (
+  reason: string | null | undefined,
+): boolean => !!reason && /debit\s*-?\s*note/i.test(reason);
+
 const relativeTime = (iso: string | null): string => {
   if (!iso) return "never";
   const ms = Date.now() - Date.parse(iso);
@@ -268,7 +274,7 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "It says a task failed to run on my node — what does that mean?",
-    a: "Your node accepted an agreement, but the task runtime terminated before (or while) the command ran, so the fleet paused matchmaking with it. Unlike performance cooldowns, this is a real technical issue on the provider machine — typical causes are the provider agent or VM runtime restarting or crashing, the machine rebooting, or the runtime being killed by the out-of-memory killer. Check your provider logs (and dmesg for OOM kills) around the time shown on this page; pricing or speed changes will not help until the machine runs tasks reliably.",
+    a: "Your node accepted an agreement, but the task ended before completing, so the fleet paused matchmaking with it. The recorded cause is shown with the notice. When it points at the provider machine, typical causes are the provider agent or VM runtime restarting or crashing, the machine rebooting, or the runtime being killed by the out-of-memory killer — check your provider logs (and dmesg for OOM kills) around the time shown on this page. Some interruptions, however, originate on the requestor side (e.g. slow payment-message acknowledgment around fleet restarts); those are labeled as not your node's fault and need no action.",
   },
   {
     q: "How do I meet the efficiency target?",
@@ -309,7 +315,9 @@ const HintAlert = ({
     const until = status.activeBan
       ? ` — it clears in ${untilTime(status.activeBan.expiresAt)}`
       : "";
-    const execFail = isExecutionFailure(status.activeBan?.reason);
+    const reason = status.activeBan?.reason;
+    const execFail =
+      isExecutionFailure(reason) && !isRequestorInterruption(reason);
     return (
       <Alert className="border-sky-500/50 [&>svg]:text-sky-500">
         <PauseCircle className="h-4 w-4" />
@@ -321,6 +329,15 @@ const HintAlert = ({
             ? "This pause was caused by a task that failed to run on your machine — see the notice below."
             : "Nothing to do on your side — work resumes automatically. The tips below show how to avoid the next pause."}
         </AlertDescription>
+      </Alert>
+    );
+  }
+  if (hint.id === "execution-interrupted") {
+    return (
+      <Alert className="border-sky-500/50 [&>svg]:text-sky-500">
+        <Info className="h-4 w-4" />
+        <AlertTitle>A task was interrupted — not your node's fault</AlertTitle>
+        <AlertDescription>{softenReason(hint.message)}</AlertDescription>
       </Alert>
     );
   }
