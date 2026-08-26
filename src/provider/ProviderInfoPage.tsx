@@ -113,10 +113,10 @@ const CATEGORY_STYLE: Record<string, string> = {
   banned: "border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10",
 };
 
-// The backend still speaks in "bans"; the page deliberately presents them as
-// temporary cooldowns so providers don't read them as a lasting sanction.
+// The backend still speaks in "bans"; since the 2026-08 rotation scheduler
+// the only bans left are rare manual suspensions, shown as a temporary pause.
 const CATEGORY_LABEL: Record<string, string> = {
-  banned: "on cooldown",
+  banned: "paused",
 };
 
 const softenReason = (s: string): string =>
@@ -232,14 +232,14 @@ const TargetMeter = ({
         ) : meets ? (
           <>
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-            <span>{ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1)}x the enforced target</span>
+            <span>{ratio >= 10 ? ratio.toFixed(0) : ratio.toFixed(1)}x the target</span>
           </>
         ) : (
           <>
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
             <span>
-              {(ratio * 100).toFixed(0)}% of the enforced target — staying
-              below 100% leads to a short cooldown
+              {(ratio * 100).toFixed(0)}% of the target — nodes above target
+              get longer and more frequent work sessions
             </span>
           </>
         )}
@@ -254,30 +254,24 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
     a: "It is your provider's standing with the Vanity Market requestor fleet — a set of Golem requestors that rent CPU time from providers like yours to search for vanity blockchain addresses. Everything here is measured from the fleet's own agreements with your node.",
   },
   {
-    q: "What is a cooldown? Should I worry?",
+    q: "Why does my node work in sessions that start and stop?",
     a: (
       <>
-        <strong>Not at all.</strong> A cooldown is a short, automatic pause in
-        matchmaking with this fleet — the fleet simply stops sending new work
-        to a node for a while when an agreement ran below the efficiency or
-        speed target. The first pause in a day lasts 1 hour; only repeated
-        ones within the same 24 hours grow a bit longer (2 h, 3 h, … capped at
-        24 h), and a clean 24 hours resets that completely. The fleet also
-        periodically clears all cooldowns at once. Nothing is held against
-        your node: it does not affect your standing anywhere else on the Golem
-        network, and work resumes automatically the moment the pause ends.
-        (Some dashboards, including stats.golem.network, label these pauses
-        &ldquo;bans&rdquo; — same thing, equally temporary.)
+        <strong>That is how the fleet shares work — it is not a sanction.</strong>{" "}
+        The fleet runs a fixed number of work slots and rotates them across
+        many providers, so everyone gets a fair chance. Sessions end on a
+        schedule; between sessions your node simply waits for its next turn.
+        How often your node is picked, and how long it keeps a session,
+        follows its measured results: efficient, reliable nodes work most of
+        the time, while new nodes start with short trial sessions so the
+        fleet can measure them. Nothing is held against your node, and none
+        of this affects your standing anywhere else on the Golem network.
       </>
     ),
   },
   {
-    q: "Why was my node paused?",
-    a: "An agreement is wound down (and the node given a short cooldown) when its measured efficiency (TH/GLM) or speed (H/s) stays below the enforced target for 3 consecutive checks. The exact trigger of your last cooldown — measured value, target, and measurement window — is shown in the Performance section above.",
-  },
-  {
-    q: "It says a task failed to run on my node — what does that mean?",
-    a: "Your node accepted an agreement, but the task ended before completing, so the fleet paused matchmaking with it. The recorded cause is shown with the notice. When it points at the provider machine, typical causes are the provider agent or VM runtime restarting or crashing, the machine rebooting, or the runtime being killed by the out-of-memory killer — check your provider logs (and dmesg for OOM kills) around the time shown on this page. Some interruptions, however, originate on the requestor side (e.g. slow payment-message acknowledgment around fleet restarts); those are labeled as not your node's fault and need no action.",
+    q: "How do I get more work from the fleet?",
+    a: "Deliver good efficiency — hashes computed per GLM billed. That is the main thing the rotation looks at: nodes above the target get long sessions with hardly any gaps, nodes below it get shorter and less frequent ones. Price is the quickest lever; see the next answer.",
   },
   {
     q: "How do I meet the efficiency target?",
@@ -289,15 +283,15 @@ const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Why do I see many very short agreements?",
-    a: "The fleet's requestors fully restart every 6 hours (staggered). Around each restart window a provider is often picked up briefly by a requestor that is itself about to restart, producing a few minutes-long agreements with almost no work besides the one long agreement. This is normal churn on the requestor side, not a fault of your node, and it does not hurt your standing.",
+    a: "Short sessions are a normal part of the rotation: new or recently quiet nodes get brief trial sessions so the fleet can measure them, and every session ends on a schedule. The fleet's requestors also fully restart every 6 hours, which adds a few extra minutes-long agreements around those windows. Neither hurts your standing.",
   },
   {
     q: "When do I get paid?",
-    a: "The fleet settles invoices in batches roughly every 6 hours, paying in GLM on Polygon. If an agreement just ended, its payment can therefore take a few hours to show up on-chain.",
+    a: "The fleet settles invoices in batches roughly every 6 hours, paying in GLM on Polygon. If an agreement just ended, its payment can therefore take a few hours to show up on-chain. Sessions are paid in full as long as the node delivered real work for what it billed; billing with essentially no measurable work is not paid out.",
   },
   {
     q: "What is the score?",
-    a: "A 0–100 blend of efficiency vs target, agreements completed without cooldowns, work volume, how recent the last cooldown was, and data freshness. It drives the category label (trusted, reliable, average, underperformer, new, risky, on cooldown) and recovers on its own as you deliver clean work.",
+    a: "A 0–100 blend of measured efficiency, session reliability, work volume, speed, and data freshness. It decides how often and how long your node works in the rotation, and it improves on its own as you deliver good work.",
   },
   {
     q: "How fresh is this data?",
@@ -357,14 +351,11 @@ const HintAlert = ({
     return (
       <Alert className="border-sky-500/50 [&>svg]:text-sky-500">
         <Info className="h-4 w-4" />
-        <AlertTitle>Recent cooldown</AlertTitle>
+        <AlertTitle>Recent pause</AlertTitle>
         <AlertDescription>
-          {status.bansLast24h === 1
-            ? "This node had one short cooldown in the last 24 h."
-            : `This node had ${status.bansLast24h} short cooldowns in the last 24 h.`}{" "}
-          Cooldowns are routine and clear on their own; repeated ones within a
-          day just last a bit longer (the next would be{" "}
-          {status.nextBanHours} h), and a clean 24 h resets that completely.
+          Work with this node was paused recently. Pauses like this are
+          temporary, clear on their own, and only affect work with this
+          fleet.
         </AlertDescription>
       </Alert>
     );
@@ -550,9 +541,8 @@ const ProviderInfoPage = () => {
           <p className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Cooldowns are routine and nothing to worry about — they clear on
-              their own and only pause work with this fleet for a short while.
-              See the FAQ below.
+              A pause only affects work with this fleet and clears on its
+              own. See the FAQ below.
             </span>
           </p>
         ) : null}
@@ -590,24 +580,22 @@ const ProviderInfoPage = () => {
           sub="with the fleet right now"
         />
         <StatTile
-          label="Cooldowns (24h)"
-          value={status.bansLast24h}
-          sub={
-            status.bansLast24h > 0
-              ? `next one would last ${status.nextBanHours} h`
-              : "clean — none in 24 h"
+          label="Rotation"
+          value={
+            status.activeAgreements > 0 ? "working now" : "between sessions"
           }
+          sub="work is shared in rotating sessions"
         />
       </div>
 
       {/* Enforced targets */}
       <Card>
         <CardHeader>
-          <CardTitle>Enforced targets</CardTitle>
+          <CardTitle>Performance targets</CardTitle>
           <CardDescription>
-            Measured over the {windowLabel}. Agreements running below either
-            target are wound down and the node gets a short matchmaking
-            cooldown.
+            Measured over the {windowLabel}. Results above target earn longer
+            and more frequent sessions in the rotation; results below mean
+            shorter, rarer ones.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -666,20 +654,15 @@ const ProviderInfoPage = () => {
               sub="GLM per hour"
             />
             <StatTile
-              label="Cooldowns in window"
-              value={perf.bans}
-              sub={
-                status.lastBanAt
-                  ? `last one ${relativeTime(status.lastBanAt)}`
-                  : "none yet"
+              label="Efficiency"
+              value={
+                perf.efficiencyThPerGlm === null
+                  ? "—"
+                  : perf.efficiencyThPerGlm.toPrecision(3)
               }
+              sub="TH per GLM"
             />
           </div>
-          {status.lastBanReason ? (
-            <p className="mt-4 text-xs text-muted-foreground">
-              Last cooldown trigger: {softenReason(status.lastBanReason)}
-            </p>
-          ) : null}
         </CardContent>
       </Card>
 
