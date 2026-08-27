@@ -91,7 +91,7 @@ interface PortalProviderReport {
 
 const PORTAL_API_BASE =
   import.meta.env.VITE_BAN_SERVER_PORTAL_URL ??
-  "https://stone.vanity.market/nmpdmxzhrm/ban-server/api/v1/portal";
+  "https://stone.vanity.market/nmpdmxzhrm/fleet/api/v1/portal";
 
 const WINDOW_LABEL: Record<string, string> = {
   d1: "last 24 hours",
