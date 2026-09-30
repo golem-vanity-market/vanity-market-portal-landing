@@ -251,7 +251,7 @@ const TargetMeter = ({
 const FAQ_ITEMS: { q: string; a: React.ReactNode }[] = [
   {
     q: "What is this page?",
-    a: "It is your provider's standing with the Vanity Market requestor fleet — a set of Golem requestors that rent CPU time from providers like yours to search for vanity blockchain addresses. Everything here is measured from the fleet's own agreements with your node.",
+    a: "It is your provider's standing with the Vanity Market requestor fleet — a set of requestors that rent CPU time from providers like yours to search for vanity blockchain addresses. Everything here is measured from the fleet's own agreements with your node.",
   },
   {
     q: "Why does my node work in sessions that start and stop?",
